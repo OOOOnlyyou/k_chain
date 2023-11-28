@@ -463,10 +463,12 @@ class KChain(object):
 
     @staticmethod
     def __plotBi(ax, biX, biY):
+        if not biX: return
         ax.plot(biX, biY, color='y', linestyle='-', linewidth=3)
 
     @staticmethod
     def __plotSegment(ax, segX, segY):
+        if not segX: return
         ax.plot(segX, segY, color='b', linestyle='-', linewidth=1)
 
     # 绘制中枢
