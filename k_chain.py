@@ -10,36 +10,37 @@ warnings.filterwarnings('ignore')
 
 class KChain(object):
     def __init__(self, chanK):
-        self.__rawChanK = chanK
-        self.__chanK = self.__toChanK(chanK)
-        self.__kState = list()  # k线状态->五种状态：(0,0)、(1,1)、(-1,1)、(1,0)、(-1,0)
+        self.__rawChanK = chanK # 原始的k线
+        self.__chanK = self.__toChanK(chanK) # 合并包含关系后的k线
+        self.__kState = list() # k线状态->五种状态：(0,0)、(1,1)、(-1,1)、(1,0)、(-1,0)
         self.__fenTypes = list()  # 分型类型列表 1,-1构成
         self.__fenIdx = list()  # 分型对应k的下标
         self.__biIdx = list()  # 笔对应的k线下标
-        self.__biFenTypes = list()  # 笔分型类型列表 1,-1构成
-        self.__frsBiType = 0  # 起始笔的走势，biIdx 奇数下标就是相反走势 1、向上，-1向下
+        self.__biFenTypes = list() # 笔分型类型列表 1,-1构成
+        # self.__frsBiType = 0  # 起始笔的走势，biIdx 奇数下标就是相反走势 1、向上，-1向下
         self.__segIdx = list()  # 线段对应的k线下标
         self.__segFenTypes = list()
-        self.__pivotSet = list()  # 存放中枢的信息集:[(leftBound,rightBound, maxLow, minHigh),...]
+        self.__pivotSet = list() # 存放中枢的信息集:[(leftBound,rightBound, maxLow, minHigh),...]
 
+    # 判断每条k线的状态
     def __kLineState(self, chanK):
         for i in range(chanK.shape[0]):
             if not self.__kState:
                 self.__kState.append((0, 0))
                 continue
             if len(self.__kState) == 1:
-                if chanK['high'][i] > chanK['high'][i - 1]:
+                if chanK['high'][i] > chanK['high'][i-1]:
                     self.__kState.append((1, 1))
                 else:
                     self.__kState.append((-1, 0))
                 continue
-            if chanK['high'][i] > chanK['high'][i - 1]:
-                if self.__kState[-1] in [(1, 1), (-1, 0)]:
+            if chanK['high'][i] > chanK['high'][i-1]:
+                if self.__kState[-1] in [(1, 1),(-1, 0)]:
                     self.__kState.append((1, 1))
                 else:
                     self.__kState.append((-1, 0))
             else:
-                if self.__kState[-1] in [(-1, 1), (1, 0)]:
+                if self.__kState[-1] in [(-1, 1),(1, 0)]:
                     self.__kState.append((-1, 1))
                 else:
                     self.__kState.append((1, 0))
@@ -49,11 +50,10 @@ class KChain(object):
     def __mergeKLine(raw_chanK, in_chan=False):
         _newColumns = ['endDate'] + list(raw_chanK.keys()) if not in_chan else list(raw_chanK.keys())
         _newChanK = pd.DataFrame(
-            np.zeros((raw_chanK.shape[0], len(_newColumns))), index=raw_chanK.index,
-            columns=_newColumns) if not in_chan else raw_chanK
+            np.zeros((raw_chanK.shape[0], len(_newColumns))), index=raw_chanK.index, columns=_newColumns) if not in_chan else raw_chanK
 
         def setNewValue(dt, value):
-            _newChanK.loc[dt, _newColumns] = value
+            _newChanK.loc[dt, _newColumns] =  value
             return dt
 
         # 比较上一个(n-1)包含的时间点
@@ -68,8 +68,7 @@ class KChain(object):
 
             # 非包含情况
             if (raw_chanK['high'][dt] > _newChanK['high'][_last1K] and raw_chanK['low'][dt] > _newChanK['low'][_last1K]) \
-                    or (raw_chanK['high'][dt] < _newChanK['high'][_last1K] and raw_chanK['low'][dt] < _newChanK['low'][
-                _last1K]):
+                    or (raw_chanK['high'][dt] < _newChanK['high'][_last1K] and raw_chanK['low'][dt] < _newChanK['low'][_last1K]):
                 _last2K = _last1K
                 if in_chan:
                     _last1K = dt
@@ -79,8 +78,7 @@ class KChain(object):
 
             # 包含情况
             endDate = dt if not in_chan else _newChanK['endDate'][dt]
-            if raw_chanK['high'][dt] >= _newChanK['high'][_last1K] and raw_chanK['low'][dt] <= _newChanK['low'][
-                _last1K]:
+            if raw_chanK['high'][dt] >= _newChanK['high'][_last1K] and raw_chanK['low'][dt] <= _newChanK['low'][_last1K]:
                 new_high, new_low = 0, 0
                 # 向上处理
                 if _newChanK['high'][_last1K] > _newChanK['high'][_last2K]:
@@ -89,11 +87,11 @@ class KChain(object):
                 else:
                     new_high, new_low = _newChanK['high'][_last1K], raw_chanK['low'][dt]
                 _last1K = setNewValue(_last1K,
-                                      [endDate, _newChanK['open'][_last1K],
-                                       new_high,
-                                       new_low,
-                                       raw_chanK['close'][dt],
-                                       raw_chanK['vol'][dt] + _newChanK['vol'][_last1K]])
+                                         [endDate, _newChanK['open'][_last1K],
+                                          new_high,
+                                          new_low,
+                                          raw_chanK['close'][dt],
+                                          raw_chanK['vol'][dt] + _newChanK['vol'][_last1K]])
             if raw_chanK['high'][dt] < _newChanK['high'][_last1K] and raw_chanK['low'][dt] > _newChanK['low'][_last1K]:
                 new_high, new_low = 0, 0
                 # 向上处理
@@ -103,11 +101,11 @@ class KChain(object):
                 else:
                     new_high, new_low = raw_chanK['high'][dt], _newChanK['low'][_last1K]
                 _last1K = setNewValue(_last1K,
-                                      [endDate, _newChanK['open'][_last1K],
-                                       new_high,
-                                       new_low,
-                                       raw_chanK['close'][dt],
-                                       raw_chanK['vol'][dt] + _newChanK['vol'][_last1K]])
+                                         [endDate, _newChanK['open'][_last1K],
+                                          new_high,
+                                          new_low,
+                                          raw_chanK['close'][dt],
+                                          raw_chanK['vol'][dt] + _newChanK['vol'][_last1K]])
             if in_chan:
                 _newChanK.at[dt, 'endDate'] = 0
         _newChanK = _newChanK[_newChanK['endDate'] != 0]
@@ -135,7 +133,7 @@ class KChain(object):
         if fenType_bf == ft:
             fenType_bf, fenIdx_bf = self.__fenTypes.pop(), self.__fenIdx.pop()
             fidx = fenIdx_bf if (ft == 1 and self.__chanK['high'][fenIdx_bf] > self.__chanK['high'][fidx]) or (
-                    ft == -1 and self.__chanK['low'][fenIdx_bf] < self.__chanK['low'][fidx]) else fidx
+                        ft == -1 and self.__chanK['low'][fenIdx_bf] < self.__chanK['low'][fidx]) else fidx
         self.__fenIdx.append(fidx)
         self.__fenTypes.append(ft)
 
@@ -156,7 +154,7 @@ class KChain(object):
     # 判断分型破坏
     def __judgeFenBreak(self, fenType, bf, af):
         return (fenType == -1 and self.__chanK['low'][af] < self.__chanK['low'][bf]) or (
-                fenType == 1 and self.__chanK['high'][af] > self.__chanK['high'][bf])
+                    fenType == 1 and self.__chanK['high'][af] > self.__chanK['high'][bf])
 
     # 判断笔破坏
     def __judgeBiBreak(self, idxb, idxa):
@@ -184,9 +182,8 @@ class KChain(object):
             self.__biIdx.append(self.__fenIdx[breakBi])
             self.__biFenTypes.append(self.__fenTypes[breakBi])
             if len(self.__biIdx) > 1 and 0 < breakBj < breakBi and self.__judgeFenBreak(self.__fenTypes[i - 1],
-                                                                                        self.__biIdx[
-                                                                                            len(self.__biIdx) - 2],
-                                                                                        self.__fenIdx[breakBj]):
+                                                              self.__biIdx[len(self.__biIdx) - 2],
+                                                              self.__fenIdx[breakBj]):
                 fa_ = self.__biIdx.pop()
                 self.__biFenTypes.pop()
                 fb_ = self.__biIdx.pop()
@@ -205,6 +202,7 @@ class KChain(object):
                 self.__biFenTypes.pop()
                 fb_ = self.__biIdx.pop()
                 self.__biFenTypes.pop()
+                # print '尾分型破坏并连接上一点, 移除分型:%d，旧分型:%d, 新的分型:%d'%(fa_, fb_,fenIdx[breakBj])
                 self.__biIdx.append(self.__fenIdx[breakBj])
                 self.__biFenTypes.append(self.__fenTypes[breakBj])
                 _toConBfIdx = breakBj
@@ -225,7 +223,6 @@ class KChain(object):
             _toConBfIdx = 0
             for j in range(len(self.__fenIdx))[i + 1::2]:
                 if (self.__fenIdx[j] - kIdx) > _least_khl_num:
-                    # breakType True 同分型， False 末尾分型
                     flag, breakBi, breakBj = self.__judgeBiBreak(i, j)
                     if flag:
                         _toConBfIdx, _bcn = self.__reAssignBi(breakBi, breakBj, i, j)
@@ -252,8 +249,7 @@ class KChain(object):
 
     # 判断线段破坏
     def __judgeSegBreak(self, fenType, afPrice, idx):
-        return (fenType == -1 and afPrice < self.__chanK['low'][idx]) or (
-                fenType == 1 and afPrice > self.__chanK['high'][idx])
+        return (fenType == -1 and afPrice < self.__chanK['low'][idx]) or (fenType == 1 and afPrice > self.__chanK['high'][idx])
 
     # 重构线段
     def __rebuildSeg(self, txIdx, nxIdx):
@@ -287,7 +283,8 @@ class KChain(object):
         afIdx = 0
         for i, idx in enumerate(self.__biIdx):
             if afIdx < 0: break  # 线段破坏以后没有合适线段
-            fenType = 1 if (self.__frsBiType == 1 and i % 2 == 1) or (self.__frsBiType == -1 and i % 2 == 0) else -1
+            # fenType = 1 if (self.__frsBiType == 1 and i % 2 != 0) or (self.__frsBiType == -1 and i % 2 == 0) else -1
+            fenType = self.__biFenTypes[i]
             # 符合要求的连段
             if i < afIdx: continue
             # 找同向相对高低点
@@ -297,16 +294,14 @@ class KChain(object):
             i_continued = False
             for j in range(i + 1, _lenBiIdx, 2):
                 # 同向相对高低点
-                if (fenType == -1 and tongxiang_price_ > self.__chanK['low'][self.__biIdx[j - 1]]) \
+                if (fenType == -1 and tongxiang_price_ > self.__chanK['low'][self.__biIdx[j-1]]) \
                         or (fenType == 1 and tongxiang_price_ < self.__chanK['high'][self.__biIdx[j - 1]]):
                     tongxiang_idx = self.__biIdx[j - 1]
-                    tongxiang_price_ = self.__chanK['high'][tongxiang_idx] if fenType == 1 else self.__chanK['low'][
-                        tongxiang_idx]
+                    tongxiang_price_ = self.__chanK['high'][tongxiang_idx] if fenType == 1 else self.__chanK['low'][tongxiang_idx]
 
                 # 线段破坏
                 # 同向破坏
                 if self.__judgeSegBreak(fenType, tongxiang_price_, idx) and idx != tongxiang_idx:
-                    #                 print '同向已经破坏'
                     afIdx, self.__segIdx, self.__segFenTypes = self.__rebuildSeg(tongxiang_idx, nixiang_idx)
                     i_continued = True
                     break
@@ -340,17 +335,16 @@ class KChain(object):
                 last_idx = self.__segIdx.pop()
                 last_type = self.__segFenTypes[len(self.__segFenTypes) - 1]
                 for j in range(self.__biIdx.index(last_idx), len(self.__biIdx))[2::2]:
-                    if self.__judgeSegBreak(last_type, self.__chanK['low'][self.__biIdx[j]] if last_type == -1 else
-                    self.__chanK['high'][self.__biIdx[j]],
-                                            last_idx):
+                    if self.__judgeSegBreak(last_type, self.__chanK['low'][self.__biIdx[j]] if last_type == -1 else self.__chanK['high'][self.__biIdx[j]],
+                                  last_idx):
                         last_idx = self.__biIdx[j]
                 self.__segIdx.append(last_idx)
                 break
 
-    def __getPivot(self, biPrices: list):
+    def __getPivot(self, biPrices:list):
         # 计算中枢
         # 注意：一个中枢至少有三笔
-        _biPointNum = len(self.__biIdx)
+        _biPointNum= len(self.__biIdx)
         _leftBound, _rightBound = 0, 0
         _maxLow, _minHigh = 0, 0
         # 不满足基本条件
@@ -361,24 +355,24 @@ class KChain(object):
         while i < _biPointNum:
             if _cover == 0:
                 _rightBound = 0
-                _leftBound = self.__biIdx[i - 1]
+                _leftBound = self.__biIdx[i-1]
                 # 所观察分型的上一笔是往上的一笔
-                if biPrices[i] >= biPrices[i - 1]:
+                if biPrices[i] >= biPrices[i-1]:
                     _minHigh = biPrices[i]
-                    _maxLow = biPrices[i - 1]
+                    _maxLow = biPrices[i-1]
                 # 所观察分型的上一笔是往下的一笔
                 else:
                     _maxLow = biPrices[i]
-                    _minHigh = biPrices[i - 1]
+                    _minHigh = biPrices[i-1]
                 _cover += 1
                 i += 1
                 continue
 
             # 往上的一笔
-            if biPrices[i] >= biPrices[i - 1]:
+            if biPrices[i] >= biPrices[i-1]:
                 # 已经没有重叠区域了
                 if biPrices[i] < _maxLow:
-                    # 判断是否满足中枢定义
+                     # 判断是否满足中枢定义
                     if _cover >= 3:
                         _rightBound = self.__biIdx[_rightIdx]
                         self.__pivotSet.append((_leftBound, _rightBound, _maxLow, _minHigh))
@@ -394,14 +388,14 @@ class KChain(object):
                     # 计算更窄的中枢价格区间
                     if _cover <= 3:
                         _minHigh = min(biPrices[i], _minHigh)
-                        _maxLow = max(biPrices[i - 1], _maxLow)
+                        _maxLow = max(biPrices[i-1], _maxLow)
                         if _cover == 3:
                             _rightIdx = i
                     elif _maxLow <= biPrices[i] <= _minHigh:
                         _rightIdx = i
                     i += 1
             # 往下的一笔
-            elif biPrices[i] < biPrices[i - 1]:
+            elif biPrices[i] < biPrices[i-1]:
                 # 已经没有重叠区域了
                 if biPrices[i] > _minHigh:
                     # 判断是否满足中枢定义
@@ -418,7 +412,7 @@ class KChain(object):
                     # 有重叠区域
                     # 计算更窄的中枢价格区间
                     if _cover <= 3:
-                        _minHigh = min(biPrices[i - 1], _minHigh)
+                        _minHigh = min(biPrices[i-1], _minHigh)
                         _maxLow = max(biPrices[i], _maxLow)
                         if _cover == 3:
                             _rightIdx = i
@@ -430,7 +424,7 @@ class KChain(object):
             self.__pivotSet.append((_leftBound, _rightBound, _maxLow, _minHigh))
 
     # 计算坐标
-    def __getXY(self, idxSeq: list, fenTypeSeq: list):
+    def __getXY(self, idxSeq:list, fenTypeSeq:list):
         _X, _Y = [], []
         for i in range(len(idxSeq)):
             if idxSeq[i]:
@@ -443,10 +437,42 @@ class KChain(object):
                     _Y.append(self.__chanK['low'][idxSeq[i]])
         return _X, _Y
 
-    def __plotPivot(self, ax, pivotSet):
-        # 绘制中枢
-        if not pivotSet: return
-        for s, e, l, h in pivotSet:
+
+    def __plotKLine(self, mav=(5, 10, 20, 30)):
+        selfColor = mpf.make_marketcolors(up='r',
+                                 down='g',
+                                 edge='inherit',
+                                 wick='inherit',
+                                 volume='inherit')
+        # 设置图表的背景色
+        selfStyle = mpf.make_mpf_style(marketcolors=selfColor,
+                                      figcolor='(0.82, 0.83, 0.85)',
+                                      gridcolor='(0.82, 0.83, 0.85)')
+
+        fig, ax = plt.subplots(figsize=(40,20))
+        mpf.plot(self.__chanK,
+                 type='candle',
+                 style=selfStyle,
+                 datetime_format='%Y-%m-%d',
+                 scale_width_adjustment = dict(candle=2.5,lines=1),
+                 xrotation=15,
+                 mav=mav,
+                 ax= ax
+        )
+        return ax
+
+    @staticmethod
+    def __plotBi(ax, biX, biY):
+        ax.plot(biX, biY, color='y', linestyle='-', linewidth=3)
+
+    @staticmethod
+    def __plotSegment(ax, segX, segY):
+        ax.plot(segX, segY, color='b', linestyle='-', linewidth=1)
+
+    # 绘制中枢
+    def __plotPivot(self, ax):
+        if not self.__pivotSet: return
+        for s, e, l, h in self.__pivotSet:
             start_point = (s, l)
             width = e - s
             height = h - l
@@ -462,71 +488,49 @@ class KChain(object):
                     linestyle=linestyle
                 )
             )
-            ax.hlines(xmin=s, xmax=e, y=(l + h) / 2, color='m', lw=2, linestyle='--')
+            ax.hlines(xmin=s, xmax=e, y=(l+h)/2, color='m', lw=2, linestyle='--')
 
-    def plot(self, lines, pivotSet, mav=(5, 10, 20, 30)):
-        selfColor = mpf.make_marketcolors(up='r',
-                                          down='g',
-                                          edge='inherit',
-                                          wick='inherit',
-                                          volume='inherit')
-        # 设置图表的背景色
-        selfStyle = mpf.make_mpf_style(marketcolors=selfColor,
-                                       figcolor='(0.82, 0.83, 0.85)',
-                                       gridcolor='(0.82, 0.83, 0.85)')
-        fig, ax = plt.subplots(figsize=(40, 20))
-        mpf.plot(self.__chanK,
-                 type='candle',
-                 style=selfStyle,
-                 alines=dict(
-                     alines=lines,
-                     colors=['y', 'b'],
-                     linestyle=['-', '-'],
-                     linewidths=[1, 3],
-                 ),
-                 datetime_format='%Y-%m-%d',
-                 # figsize=(40,20),
-                 scale_width_adjustment=dict(candle=2.5, lines=1),
-                 xrotation=15,
-                 mav=mav,
-                 ax=ax
-                 )
-        self.__plotPivot(ax, pivotSet)
-        plt.show()
-
+    # 绘制每条K的状态
     def plotKState(self, rawK=False):
         _chanK = self.__rawChanK if rawK else self.__chanK
         self.__kLineState(_chanK)
         selfColor = mpf.make_marketcolors(up='r',
-                                          down='g',
-                                          edge='inherit',
-                                          wick='inherit',
-                                          volume='inherit')
+                                 down='g',
+                                 edge='inherit',
+                                 wick='inherit',
+                                 volume='inherit')
         # 设置图表的背景色
         selfStyle = mpf.make_mpf_style(marketcolors=selfColor,
-                                       figcolor='(0.82, 0.83, 0.85)',
-                                       gridcolor='(0.82, 0.83, 0.85)')
-        fig, ax = plt.subplots(figsize=(40, 20))
+                                      figcolor='(0.82, 0.83, 0.85)',
+                                      gridcolor='(0.82, 0.83, 0.85)')
+        fig, ax = plt.subplots(figsize=(40,20))
         mpf.plot(_chanK,
                  type='candle',
                  style=selfStyle,
                  datetime_format='%Y-%m-%d',
-                 scale_width_adjustment=dict(candle=2.5, lines=1),
+                 scale_width_adjustment = dict(candle=2.5,lines=1),
                  xrotation=15,
                  mav=(5, 10, 20, 30),
-                 ax=ax
-                 )
+                 ax= ax
+        )
         for x, state in zip(range(_chanK.shape[0]), self.__kState):
-            y = _chanK.loc[_chanK.index[x], 'high']
+            y = _chanK.loc[_chanK.index[x],'high']
             ax.text(x, y, state, fontweight='bold')
         plt.show()
 
-    def main(self):
+    def main(self, showBi=True, showSeg=True, showPivot=True):
         self.__findFenType()
+        ax = self.__plotKLine()
         self.__getBi()
-        self.__getSegment()
         _biX, _biY = self.__getXY(self.__biIdx, self.__biFenTypes)
-        _segX, _segY = self.__getXY(self.__segIdx, self.__segFenTypes)
-        lines = [list(zip(_biX, _biY)), list(zip(_segX, _segY))]
-        self.__getPivot(_biY)
-        self.plot(lines, self.__pivotSet)
+        if showBi:
+            self.__plotBi(ax, self.__biIdx, _biY)
+        if showSeg:
+            self.__getSegment()
+            _segX, _segY = self.__getXY(self.__segIdx, self.__segFenTypes)
+            self.__plotSegment(ax, self.__segIdx, _segY)
+        if showPivot:
+            self.__getPivot(_biY)
+            self.__plotPivot(ax)
+        # plt.savefig('./images/k_chain_image1.png')
+        plt.show()
