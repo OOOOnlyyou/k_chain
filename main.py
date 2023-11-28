@@ -12,4 +12,4 @@ data.set_index(['trade_date'], inplace=True)
 data.sort_index(inplace=True)
 
 k_chain = KChain(data)
-k_chain.main()
+k_chain.main(showBi=True, showSeg=True, showPivot=True)
