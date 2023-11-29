@@ -202,13 +202,12 @@ class KChain(object):
                 self.__biFenTypes.pop()
                 fb_ = self.__biIdx.pop()
                 self.__biFenTypes.pop()
-                # print '尾分型破坏并连接上一点, 移除分型:%d，旧分型:%d, 新的分型:%d'%(fa_, fb_,fenIdx[breakBj])
                 self.__biIdx.append(self.__fenIdx[breakBj])
                 self.__biFenTypes.append(self.__fenTypes[breakBj])
                 _toConBfIdx = breakBj
                 return _toConBfIdx, -1  # -1：break 1:continue 0:不执行
-            return _toConBfIdx, 1  # -1：break 1:continue 0:不执行
-        return _toConBfIdx, 0  # -1：break 1:continue 0:不执行
+            return _toConBfIdx, 1
+        return _toConBfIdx, 0
 
     # 分型构成笔
     # 构成笔条件，1、顶低分型间隔了n个k线， 2、中间不会出现比第一个分型结构更高（顶）或更低（底）的分型，否则线段破坏，连接上一笔
